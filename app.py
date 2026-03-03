@@ -39,7 +39,8 @@ class Character:
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret")
-socketio = SocketIO(app, cors_allowed_origins="*")
+SOCKETIO_ASYNC_MODE = os.getenv("SOCKETIO_ASYNC_MODE", "threading").strip() or "threading"
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode=SOCKETIO_ASYNC_MODE)
 
 characters: Dict[str, Character] = {}
 characters_lock = Lock()
@@ -153,6 +154,26 @@ def get_ssl_context() -> str | tuple[str, str] | None:
     if use_adhoc:
         return "adhoc"
     return None
+
+
+def build_socketio_run_kwargs(port: int) -> dict:
+    ssl_context = get_ssl_context()
+    run_kwargs = {"host": "0.0.0.0", "port": port}
+
+    if isinstance(ssl_context, tuple):
+        cert_file, key_file = ssl_context
+        run_kwargs["certfile"] = cert_file
+        run_kwargs["keyfile"] = key_file
+    elif ssl_context == "adhoc":
+        if socketio.async_mode == "threading":
+            run_kwargs["ssl_context"] = "adhoc"
+        else:
+            raise RuntimeError(
+                "SSL_ADHOC requires SOCKETIO_ASYNC_MODE=threading. "
+                "Use SSL_CERT_FILE/SSL_KEY_FILE for eventlet/gevent."
+            )
+
+    return run_kwargs
 
 
 @app.get("/")
@@ -283,5 +304,4 @@ def get_characters():
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
-    ssl_context = get_ssl_context()
-    socketio.run(app, host="0.0.0.0", port=port, ssl_context=ssl_context)
+    socketio.run(app, **build_socketio_run_kwargs(port))
