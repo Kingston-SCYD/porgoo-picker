@@ -84,3 +84,23 @@ When HTTPS is enabled, use `https://...` URLs in your browser source and panel l
 If you force `SOCKETIO_ASYNC_MODE=eventlet`, use `SSL_CERT_FILE` + `SSL_KEY_FILE` instead of `SSL_ADHOC`.
 
 When running in default `threading` mode, the app passes `allow_unsafe_werkzeug=True` for local/self-hosted runs.
+
+
+## Playit HTTPS tunnel (no port in URL)
+
+To let users open the panel without `:PORT` in the URL:
+
+1. Run this app locally on any port (default `5000`).
+2. In Playit, create an **HTTPS** tunnel and point it to your local app port.
+3. Share the Playit HTTPS hostname (for example `https://yourname.playit.gg`).
+4. Use the same host for OBS Browser Source overlay URL: `https://yourname.playit.gg/overlay`.
+
+This app uses relative URLs in the frontend, so users do not need to append a port when visiting through Playit.
+
+### Proxy headers
+
+When behind Playit/reverse proxies, keep `TRUST_PROXY_HEADERS=1` (default). This makes Flask honor forwarded protocol/host headers so generated links and request context stay on the HTTPS public host.
+
+You can verify the public URLs resolved by the app at:
+
+- `GET /api/links`

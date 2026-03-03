@@ -9,6 +9,7 @@ from typing import Dict, List
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_socketio import SocketIO
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 try:
     from obsws_python import ReqClient
@@ -39,6 +40,11 @@ class Character:
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret")
+
+TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "1").strip().lower() in {"1", "true", "yes", "on"}
+if TRUST_PROXY_HEADERS:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
 SOCKETIO_ASYNC_MODE = os.getenv("SOCKETIO_ASYNC_MODE", "threading").strip() or "threading"
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=SOCKETIO_ASYNC_MODE)
 
@@ -192,6 +198,12 @@ def overlay():
 @app.get("/api/obs-status")
 def obs_status():
     return jsonify(get_obs_status())
+
+
+@app.get("/api/links")
+def get_links():
+    base = request.host_url.rstrip("/")
+    return jsonify({"panel_url": f"{base}/", "overlay_url": f"{base}/overlay"})
 
 
 @app.get("/api/assets")
