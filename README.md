@@ -50,3 +50,29 @@ Add the overlay URL as an OBS Browser Source in your scene.
 - Usernames containing offensive/slur substrings are rejected (customizable via `OFFENSIVE_NAME_SUBSTRINGS`).
 
 - On refresh, the app restores your locked username and latest submitted character design for that fingerprint.
+
+
+## HTTPS (for Playit forwarding)
+
+You can run the panel over HTTPS in two ways:
+
+- **Provided certificate files**
+  - Set `SSL_CERT_FILE` and `SSL_KEY_FILE` to your cert/key paths.
+- **Adhoc self-signed certificate**
+  - Set `SSL_ADHOC=1` (good for quick testing).
+
+Example with cert files:
+
+```bash
+SSL_CERT_FILE=/path/to/fullchain.pem \
+SSL_KEY_FILE=/path/to/privkey.pem \
+python app.py
+```
+
+Example with adhoc TLS:
+
+```bash
+SSL_ADHOC=1 python app.py
+```
+
+When HTTPS is enabled, use `https://...` URLs in your browser source and panel links.

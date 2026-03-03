@@ -143,6 +143,18 @@ def get_obs_status() -> dict:
         return {"connected": False, "error": str(exc)}
 
 
+def get_ssl_context() -> str | tuple[str, str] | None:
+    cert_file = os.getenv("SSL_CERT_FILE", "").strip()
+    key_file = os.getenv("SSL_KEY_FILE", "").strip()
+    use_adhoc = os.getenv("SSL_ADHOC", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+    if cert_file and key_file:
+        return (cert_file, key_file)
+    if use_adhoc:
+        return "adhoc"
+    return None
+
+
 @app.get("/")
 def index():
     return render_template("index.html")
@@ -270,4 +282,6 @@ def get_characters():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "5000")))
+    port = int(os.getenv("PORT", "5000"))
+    ssl_context = get_ssl_context()
+    socketio.run(app, host="0.0.0.0", port=port, ssl_context=ssl_context)
