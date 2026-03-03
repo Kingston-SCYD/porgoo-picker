@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import time
-from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Lock
@@ -45,10 +44,32 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 characters: Dict[str, Character] = {}
 characters_lock = Lock()
 
-MAX_UNIQUE_NAMES_PER_CREATOR = int(os.getenv("MAX_UNIQUE_NAMES_PER_CREATOR", "5"))
 MIN_SUBMIT_INTERVAL_SECONDS = float(os.getenv("MIN_SUBMIT_INTERVAL_SECONDS", "1.5"))
 
-creator_name_registry: Dict[str, set[str]] = defaultdict(set)
+DEFAULT_BLOCKED_SUBSTRINGS = [
+    "fuck",
+    "shit",
+    "bitch",
+    "asshole",
+    "bastard",
+    "cunt",
+    "whore",
+    "slut",
+    "nigger",
+    "faggot",
+    "kike",
+    "spic",
+    "chink",
+    "retard",
+]
+
+blocked_name_substrings = [
+    term.strip().lower()
+    for term in os.getenv("OFFENSIVE_NAME_SUBSTRINGS", ",".join(DEFAULT_BLOCKED_SUBSTRINGS)).split(",")
+    if term.strip()
+]
+
+creator_username_registry: Dict[str, str] = {}
 creator_last_submit_at: Dict[str, float] = {}
 submission_lock = Lock()
 
@@ -60,6 +81,19 @@ def get_creator_key() -> str:
     return f"{ip}|{user_agent}"
 
 
+LEET_TRANSLATION = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
+
+
+def normalize_username_for_filter(username: str) -> str:
+    lowered = username.lower().translate(LEET_TRANSLATION)
+    return "".join(ch for ch in lowered if ch.isalnum())
+
+
+def has_offensive_username(username: str) -> bool:
+    normalized = normalize_username_for_filter(username)
+    return any(term in normalized for term in blocked_name_substrings)
+
+
 def enforce_submission_limits(creator_key: str, username_key: str) -> str | None:
     now = time.time()
     with submission_lock:
@@ -67,11 +101,12 @@ def enforce_submission_limits(creator_key: str, username_key: str) -> str | None
         if last_submit is not None and now - last_submit < MIN_SUBMIT_INTERVAL_SECONDS:
             return "You are submitting too quickly. Please wait a moment and try again."
 
-        existing_names = creator_name_registry[creator_key]
-        if username_key not in existing_names and len(existing_names) >= MAX_UNIQUE_NAMES_PER_CREATOR:
-            return "You have reached the limit of unique character names from this device."
+        registered_username = creator_username_registry.get(creator_key)
+        if registered_username is None:
+            creator_username_registry[creator_key] = username_key
+        elif registered_username != username_key:
+            return "Only one username is allowed per device fingerprint while this app is running."
 
-        existing_names.add(username_key)
         creator_last_submit_at[creator_key] = now
     return None
 
@@ -165,6 +200,8 @@ def add_or_update_character():
 
     if not username:
         return jsonify({"error": "username is required"}), 400
+    if has_offensive_username(username):
+        return jsonify({"error": "username contains blocked language"}), 400
 
     username_key = username.lower()
     if not body:

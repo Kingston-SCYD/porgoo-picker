@@ -43,3 +43,8 @@ python app.py
 - Overlay URL: `http://localhost:5000/overlay`
 
 Add the overlay URL as an OBS Browser Source in your scene.
+
+## Username policies
+
+- Each device fingerprint (IP + User-Agent) can only use one username per app run.
+- Usernames containing offensive/slur substrings are rejected (customizable via `OFFENSIVE_NAME_SUBSTRINGS`).
