@@ -4,13 +4,14 @@ import math
 import os
 import random
 import re
+import secrets
 import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, g, jsonify, render_template, request, send_from_directory
 from flask_socketio import SocketIO
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -80,6 +81,36 @@ blocked_name_substrings = [
 LEET_TRANSLATION = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
 
 
+
+CREATOR_ID_COOKIE = "porgu_creator_id"
+CREATOR_ID_RE = re.compile(r"^[a-f0-9]{32}$")
+
+
+def get_or_assign_creator_id() -> str:
+    creator_id = (request.cookies.get(CREATOR_ID_COOKIE) or "").strip().lower()
+    if CREATOR_ID_RE.fullmatch(creator_id):
+        g.creator_id_to_set = None
+        return creator_id
+
+    creator_id = secrets.token_hex(16)
+    g.creator_id_to_set = creator_id
+    return creator_id
+
+
+def attach_creator_cookie(response):
+    creator_id_to_set = getattr(g, "creator_id_to_set", None)
+    if creator_id_to_set:
+        response.set_cookie(
+            CREATOR_ID_COOKIE,
+            creator_id_to_set,
+            max_age=60 * 60 * 24 * 365,
+            httponly=True,
+            samesite="Lax",
+            secure=request.is_secure,
+        )
+    return response
+
+
 OBS_CONFIG = {
     "host": os.getenv("OBS_HOST", "localhost"),
     "port": int(os.getenv("OBS_PORT", "4455")),
@@ -88,17 +119,8 @@ OBS_CONFIG = {
 }
 
 
-def get_creator_ip() -> str:
-    forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    if forwarded_for:
-        return forwarded_for
-    return (request.remote_addr or "unknown").strip()
-
-
 def get_creator_key() -> str:
-    ip = get_creator_ip().lower()
-    user_agent = (request.headers.get("User-Agent") or "unknown").strip().lower()
-    return f"{ip}|{user_agent}"
+    return get_or_assign_creator_id()
 
 
 def normalize_username_key(username: str) -> str:
@@ -310,6 +332,12 @@ USERNAME_ALLOWED_RE = re.compile(r"^[A-Za-z0-9 _.-]{2,20}$")
 @app.before_request
 def _start_physics_once() -> None:
     ensure_physics_thread_started()
+    get_or_assign_creator_id()
+
+
+@app.after_request
+def _attach_creator_cookie(response):
+    return attach_creator_cookie(response)
 
 
 @app.get("/")

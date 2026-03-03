@@ -47,7 +47,7 @@ Add the overlay URL as an OBS Browser Source in your scene.
 
 ## Username policies
 
-- Each device fingerprint (IP + User-Agent) can only use one username per app run.
+- Each browser gets a persistent creator cookie ID, and each creator ID can only use one username per app run.
 - Usernames containing offensive/slur substrings are rejected (customizable via `OFFENSIVE_NAME_SUBSTRINGS`).
 
 - On refresh, the app restores your locked username and latest submitted character design for that fingerprint.
