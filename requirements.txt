@@ -1,0 +1,5 @@
+Flask==3.0.3
+Flask-SocketIO==5.3.6
+python-socketio==5.11.4
+eventlet==0.36.1
+obsws-python==1.7.0
