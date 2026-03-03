@@ -8,6 +8,7 @@ const state = {
   entities: new Map(),
   grabbedKey: null,
   pointer: { x: 0, y: 0, lastX: 0, lastY: 0, lastT: performance.now() },
+  activePointerId: null,
 };
 
 function createEntity(char) {
@@ -22,14 +23,17 @@ function createEntity(char) {
 
   const body = document.createElement("img");
   body.className = "layer body";
+  body.draggable = false;
   stack.appendChild(body);
 
   const eyes = document.createElement("img");
   eyes.className = "layer eyes";
+  eyes.draggable = false;
   stack.appendChild(eyes);
 
   const mouth = document.createElement("img");
   mouth.className = "layer mouth";
+  mouth.draggable = false;
   stack.appendChild(mouth);
 
   const name = document.createElement("div");
@@ -136,6 +140,7 @@ function emitState(entity, grabbed) {
 }
 
 function onPointerMove(event) {
+  if (state.activePointerId !== null && event.pointerId !== state.activePointerId) return;
   const now = performance.now();
   const dt = Math.max((now - state.pointer.lastT) / 1000, 0.001);
   state.pointer.lastX = state.pointer.x;
@@ -161,11 +166,16 @@ function onPointerMove(event) {
   render();
 }
 
-function releaseGrab() {
+function releaseGrab(event) {
+  if (event && state.activePointerId !== null && event.pointerId !== state.activePointerId) return;
   if (!state.grabbedKey) return;
   const entity = state.entities.get(state.grabbedKey);
   state.grabbedKey = null;
   overlay.classList.remove("dragging");
+  if (state.activePointerId !== null && overlay.hasPointerCapture(state.activePointerId)) {
+    overlay.releasePointerCapture(state.activePointerId);
+  }
+  state.activePointerId = null;
   if (!entity) return;
   entity.grabbed = false;
 
@@ -175,6 +185,7 @@ function releaseGrab() {
 }
 
 function onPointerDown(event) {
+  event.preventDefault();
   const node = event.target.closest(".character");
   if (!node) return;
 
@@ -191,6 +202,8 @@ function onPointerDown(event) {
   if (event.button !== 0) return;
 
   state.grabbedKey = key;
+  state.activePointerId = event.pointerId;
+  overlay.setPointerCapture(event.pointerId);
   entity.grabbed = true;
   entity.vx = 0;
   entity.vy = 0;
@@ -217,10 +230,11 @@ function render() {
   }
 }
 
-window.addEventListener("pointermove", onPointerMove);
-window.addEventListener("pointerup", releaseGrab);
-window.addEventListener("pointercancel", releaseGrab);
+overlay.addEventListener("pointermove", onPointerMove);
+overlay.addEventListener("pointerup", releaseGrab);
+overlay.addEventListener("pointercancel", releaseGrab);
 overlay.addEventListener("pointerdown", onPointerDown);
+overlay.addEventListener("dragstart", (event) => event.preventDefault());
 overlay.addEventListener("contextmenu", (event) => event.preventDefault());
 window.addEventListener("resize", render);
 
