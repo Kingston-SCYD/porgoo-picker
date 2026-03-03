@@ -34,8 +34,8 @@ class Character:
     hue: int
     saturation: int
     brightness: int
-    size: int
-    speed: float
+    size: int = 75
+    speed: float = 1.2
 
 
 app = Flask(__name__)
@@ -158,7 +158,7 @@ def add_or_update_character():
         hue = int(payload.get("hue", 0))
         saturation = int(payload.get("saturation", 100))
         brightness = int(payload.get("brightness", 100))
-        size = int(payload.get("size", 128))
+        size = 75
         speed = float(payload.get("speed", 1.2))
     except (TypeError, ValueError):
         return jsonify({"error": "numeric fields contain invalid values"}), 400
@@ -181,8 +181,6 @@ def add_or_update_character():
         return jsonify({"error": "saturation must be between 0 and 200"}), 400
     if not (20 <= brightness <= 200):
         return jsonify({"error": "brightness must be between 20 and 200"}), 400
-    if not (64 <= size <= 256):
-        return jsonify({"error": "size must be between 64 and 256"}), 400
     if not (0.2 <= speed <= 3.0):
         return jsonify({"error": "speed must be between 0.2 and 3.0"}), 400
 

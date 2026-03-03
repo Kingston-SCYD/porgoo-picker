@@ -149,7 +149,7 @@ function tick(now) {
     const squishY = Math.max(0.9, Math.min(1.1, 1 - rising * 0.05 + falling * 0.07));
 
     entity.node.style.transform = `translate(${entity.x}px, ${entity.y}px)`;
-    entity.facing.style.transform = `scaleX(${entity.dir === 1 ? 1 : -1})`;
+    entity.facing.style.transform = `scaleX(${entity.dir === 1 ? -1 : 1})`;
     entity.stack.style.transform = `scale(${squishX}, ${squishY})`;
   }
 

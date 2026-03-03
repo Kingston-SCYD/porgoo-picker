@@ -4,7 +4,6 @@ const statusEl = document.querySelector("#obs-status");
 const hueInput = document.querySelector("#hue");
 const saturationInput = document.querySelector("#saturation");
 const brightnessInput = document.querySelector("#brightness");
-const sizeInput = document.querySelector("#size");
 const speedInput = document.querySelector("#speed");
 const usernameInput = document.querySelector("#username");
 
@@ -28,7 +27,6 @@ function updateValueDisplays() {
   document.querySelector("#hue-value").textContent = hueInput.value;
   document.querySelector("#saturation-value").textContent = saturationInput.value;
   document.querySelector("#brightness-value").textContent = brightnessInput.value;
-  document.querySelector("#size-value").textContent = sizeInput.value;
   document.querySelector("#speed-value").textContent = speedInput.value;
 }
 
@@ -50,8 +48,8 @@ function updateLivePreview() {
   const eyes = selectedAsset("eyes");
   const mouth = selectedAsset("mouth");
 
-  livePreview.querySelector(".stack").style.width = `${sizeInput.value}px`;
-  livePreview.querySelector(".stack").style.height = `${sizeInput.value}px`;
+  livePreview.querySelector(".stack").style.width = "75px";
+  livePreview.querySelector(".stack").style.height = "75px";
 
   previewName.textContent = usernameInput.value.trim() || "Preview";
 
@@ -137,7 +135,6 @@ form.addEventListener("submit", async (event) => {
     hue: Number(hueInput.value),
     saturation: Number(saturationInput.value),
     brightness: Number(brightnessInput.value),
-    size: Number(sizeInput.value),
     speed: Number(speedInput.value),
   };
 
@@ -155,7 +152,7 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-for (const input of [hueInput, saturationInput, brightnessInput, sizeInput, speedInput, usernameInput]) {
+for (const input of [hueInput, saturationInput, brightnessInput, speedInput, usernameInput]) {
   input.addEventListener("input", () => {
     updateValueDisplays();
     updateLivePreview();

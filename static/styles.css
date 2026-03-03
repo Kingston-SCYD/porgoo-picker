@@ -155,7 +155,9 @@ button {
 }
 
 .name {
-  margin-top: 0.1rem;
+  order: -1;
+  margin-top: 0;
+  margin-bottom: 0.1rem;
   font-weight: 700;
   font-size: 0.9rem;
 }

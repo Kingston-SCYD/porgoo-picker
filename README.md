@@ -18,7 +18,7 @@ The UI provides left/right arrow selectors with a center preview box for each la
 - Username
 - Body / Eyes / Mouth selection via arrows
 - Hue, Saturation, Brightness sliders (applied to body layer)
-- Size and speed sliders
+- Speed slider (character size is fixed at 75px)
 
 ## Requirements
 
