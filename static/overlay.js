@@ -67,6 +67,7 @@ function upsertCharacters(characters) {
         x: Math.random() * Math.max(width - char.size, 1),
         y: 0,
         vy: 0,
+        vx: 0,
         dir: Math.random() > 0.5 ? 1 : -1,
         nextJumpIn: randomJumpDelay(),
       };
@@ -117,22 +118,34 @@ function tick(now) {
     const { character } = entity;
     if (!character) continue;
 
-    const horizontalPxPerSecond = character.speed * 90;
-    entity.x += entity.dir * horizontalPxPerSecond * dt;
-
     const maxX = Math.max(width - character.size, 0);
-    if (entity.x <= 0) {
-      entity.x = 0;
-      entity.dir = 1;
-    } else if (entity.x >= maxX) {
-      entity.x = maxX;
-      entity.dir = -1;
-    }
 
     entity.nextJumpIn -= dt;
     if (entity.y === 0 && entity.nextJumpIn <= 0) {
+      if (entity.x <= 0) {
+        entity.dir = 1;
+      } else if (entity.x >= maxX) {
+        entity.dir = -1;
+      }
+
+      const hopSpeed = character.speed * 105;
+      entity.vx = entity.dir * hopSpeed;
       entity.vy = -(155 + Math.random() * 55);
       entity.nextJumpIn = randomJumpDelay();
+    }
+
+    if (entity.y < 0 || entity.vy < 0) {
+      entity.x += entity.vx * dt;
+    }
+
+    if (entity.x <= 0) {
+      entity.x = 0;
+      entity.dir = 1;
+      entity.vx = Math.abs(entity.vx);
+    } else if (entity.x >= maxX) {
+      entity.x = maxX;
+      entity.dir = -1;
+      entity.vx = -Math.abs(entity.vx);
     }
 
     entity.vy += 540 * dt;
@@ -141,6 +154,7 @@ function tick(now) {
     if (entity.y > 0) {
       entity.y = 0;
       entity.vy = 0;
+      entity.vx = 0;
     }
 
     const rising = Math.max(-entity.vy / 240, 0);
