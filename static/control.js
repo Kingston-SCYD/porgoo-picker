@@ -109,12 +109,12 @@ async function loadObsStatus() {
       statusEl.className = "status ok";
       statusEl.textContent = `✅ Connected to OBS ${data.obs_version} (WebSocket ${data.websocket_version})`;
     } else {
-      statusEl.className = "status err";
-      statusEl.textContent = `⚠️ OBS not connected: ${data.error}`;
+      statusEl.className = "status hidden";
+      statusEl.textContent = "";
     }
   } catch (error) {
-    statusEl.className = "status err";
-    statusEl.textContent = `⚠️ Could not check OBS status: ${error}`;
+    statusEl.className = "status hidden";
+    statusEl.textContent = "";
   }
 }
 
