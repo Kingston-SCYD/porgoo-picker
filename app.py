@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import time
+from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Lock
@@ -42,6 +44,37 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 characters: Dict[str, Character] = {}
 characters_lock = Lock()
+
+MAX_UNIQUE_NAMES_PER_CREATOR = int(os.getenv("MAX_UNIQUE_NAMES_PER_CREATOR", "5"))
+MIN_SUBMIT_INTERVAL_SECONDS = float(os.getenv("MIN_SUBMIT_INTERVAL_SECONDS", "1.5"))
+
+creator_name_registry: Dict[str, set[str]] = defaultdict(set)
+creator_last_submit_at: Dict[str, float] = {}
+submission_lock = Lock()
+
+
+def get_creator_key() -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    ip = forwarded_for or request.remote_addr or "unknown"
+    user_agent = request.headers.get("User-Agent", "unknown")
+    return f"{ip}|{user_agent}"
+
+
+def enforce_submission_limits(creator_key: str, username_key: str) -> str | None:
+    now = time.time()
+    with submission_lock:
+        last_submit = creator_last_submit_at.get(creator_key)
+        if last_submit is not None and now - last_submit < MIN_SUBMIT_INTERVAL_SECONDS:
+            return "You are submitting too quickly. Please wait a moment and try again."
+
+        existing_names = creator_name_registry[creator_key]
+        if username_key not in existing_names and len(existing_names) >= MAX_UNIQUE_NAMES_PER_CREATOR:
+            return "You have reached the limit of unique character names from this device."
+
+        existing_names.add(username_key)
+        creator_last_submit_at[creator_key] = now
+    return None
+
 
 
 OBS_CONFIG = {
@@ -132,6 +165,8 @@ def add_or_update_character():
 
     if not username:
         return jsonify({"error": "username is required"}), 400
+
+    username_key = username.lower()
     if not body:
         return jsonify({"error": "body png is required"}), 400
     if body not in list_pngs("body"):
@@ -151,6 +186,11 @@ def add_or_update_character():
     if not (0.2 <= speed <= 3.0):
         return jsonify({"error": "speed must be between 0.2 and 3.0"}), 400
 
+    creator_key = get_creator_key()
+    limit_error = enforce_submission_limits(creator_key, username_key)
+    if limit_error:
+        return jsonify({"error": limit_error}), 429
+
     character = Character(
         username=username,
         body=body,
@@ -164,7 +204,7 @@ def add_or_update_character():
     )
 
     with characters_lock:
-        characters[username.lower()] = character
+        characters[username_key] = character
         serialized = [asdict(char) for char in characters.values()]
 
     socketio.emit("characters_updated", serialized)

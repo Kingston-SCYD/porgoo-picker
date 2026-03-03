@@ -14,6 +14,10 @@ const previewMouth = document.querySelector("#preview-mouth");
 const previewName = document.querySelector("#preview-name");
 const livePreview = document.querySelector("#live-preview");
 
+const selectedBody = document.querySelector("#selected-body");
+const selectedEyes = document.querySelector("#selected-eyes");
+const selectedMouth = document.querySelector("#selected-mouth");
+
 const selectorState = {
   body: { assets: [], index: 0 },
   eyes: { assets: [], index: 0 },
@@ -34,6 +38,13 @@ function selectedAsset(category) {
   return state.assets[state.index];
 }
 
+function stepCategory(category, direction) {
+  const state = selectorState[category];
+  if (!state.assets.length) return;
+  state.index = (state.index + direction + state.assets.length) % state.assets.length;
+  updateLivePreview();
+}
+
 function updateLivePreview() {
   const body = selectedAsset("body");
   const eyes = selectedAsset("eyes");
@@ -43,6 +54,10 @@ function updateLivePreview() {
   livePreview.querySelector(".stack").style.height = `${sizeInput.value}px`;
 
   previewName.textContent = usernameInput.value.trim() || "Preview";
+
+  selectedBody.textContent = body || "None";
+  selectedEyes.textContent = eyes || "None";
+  selectedMouth.textContent = mouth || "None";
 
   if (body) {
     previewBody.src = `/asset/body/${encodeURIComponent(body)}`;
@@ -68,46 +83,13 @@ function updateLivePreview() {
   previewBody.style.filter = `hue-rotate(${hueInput.value}deg) saturate(${saturationInput.value}%) brightness(${brightnessInput.value}%)`;
 }
 
-function renderSelector(category) {
-  const root = document.querySelector(`.selector[data-category='${category}']`);
-  const label = root.querySelector(".label");
-  const preview = root.querySelector(".preview");
-
-  const file = selectedAsset(category);
-  if (!file) {
-    label.textContent = "None";
-    preview.removeAttribute("src");
-    preview.style.visibility = "hidden";
-    updateLivePreview();
-    return;
-  }
-
-  label.textContent = file;
-  preview.style.visibility = "visible";
-  preview.src = `/asset/${category}/${encodeURIComponent(file)}`;
-  updateLivePreview();
-}
-
-function wireSelectorArrows() {
-  for (const selector of document.querySelectorAll(".selector")) {
-    const category = selector.dataset.category;
-    const prev = selector.querySelector(".prev");
-    const next = selector.querySelector(".next");
-
-    prev.addEventListener("click", () => {
-      const state = selectorState[category];
-      if (!state.assets.length) return;
-      state.index = (state.index - 1 + state.assets.length) % state.assets.length;
-      renderSelector(category);
-    });
-
-    next.addEventListener("click", () => {
-      const state = selectorState[category];
-      if (!state.assets.length) return;
-      state.index = (state.index + 1) % state.assets.length;
-      renderSelector(category);
-    });
-  }
+function wireArrows() {
+  document.querySelector("#body-prev").addEventListener("click", () => stepCategory("body", -1));
+  document.querySelector("#body-next").addEventListener("click", () => stepCategory("body", 1));
+  document.querySelector("#eyes-prev").addEventListener("click", () => stepCategory("eyes", -1));
+  document.querySelector("#eyes-next").addEventListener("click", () => stepCategory("eyes", 1));
+  document.querySelector("#mouth-prev").addEventListener("click", () => stepCategory("mouth", -1));
+  document.querySelector("#mouth-next").addEventListener("click", () => stepCategory("mouth", 1));
 }
 
 async function loadAssets() {
@@ -116,8 +98,8 @@ async function loadAssets() {
   for (const category of ["body", "eyes", "mouth"]) {
     selectorState[category].assets = data[category] || [];
     selectorState[category].index = 0;
-    renderSelector(category);
   }
+  updateLivePreview();
 }
 
 async function loadObsStatus() {
@@ -180,7 +162,7 @@ for (const input of [hueInput, saturationInput, brightnessInput, sizeInput, spee
   });
 }
 
-wireSelectorArrows();
+wireArrows();
 updateValueDisplays();
 updateLivePreview();
 loadObsStatus();
