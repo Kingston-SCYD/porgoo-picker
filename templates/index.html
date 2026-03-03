@@ -10,9 +10,23 @@
     <main class="layout">
       <section class="card">
         <h1>OBS Character Controller</h1>
-        <p>Use 256x256 PNG layers in <code>Body/</code>, <code>eyes/</code>, and <code>mouth/</code>.</p>
 
         <div id="obs-status" class="status">Checking OBS connection…</div>
+
+        <div class="live-preview-wrap">
+          <div class="live-preview-stage">
+            <div id="live-preview" class="live-preview-character">
+              <div class="facing">
+                <div class="stack">
+                  <img id="preview-body" class="layer" alt="preview body" />
+                  <img id="preview-eyes" class="layer" alt="preview eyes" />
+                  <img id="preview-mouth" class="layer" alt="preview mouth" />
+                </div>
+              </div>
+              <div id="preview-name" class="name">Preview</div>
+            </div>
+          </div>
+        </div>
 
         <form id="character-form" class="form">
           <label>
@@ -21,7 +35,7 @@
           </label>
 
           <div class="selector-group">
-            <div class="selector-title">Body (required)</div>
+            <div class="selector-title">Body</div>
             <div class="selector" data-category="body">
               <button type="button" class="arrow prev">◀</button>
               <div class="center-box">
@@ -83,8 +97,6 @@
 
           <button type="submit">Submit to Overlay</button>
         </form>
-
-        <p class="small">Add <code>http://localhost:5000/overlay</code> as an OBS Browser Source.</p>
       </section>
     </main>
 

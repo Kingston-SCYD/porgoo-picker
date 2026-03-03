@@ -6,6 +6,13 @@ const saturationInput = document.querySelector("#saturation");
 const brightnessInput = document.querySelector("#brightness");
 const sizeInput = document.querySelector("#size");
 const speedInput = document.querySelector("#speed");
+const usernameInput = document.querySelector("#username");
+
+const previewBody = document.querySelector("#preview-body");
+const previewEyes = document.querySelector("#preview-eyes");
+const previewMouth = document.querySelector("#preview-mouth");
+const previewName = document.querySelector("#preview-name");
+const livePreview = document.querySelector("#live-preview");
 
 const selectorState = {
   body: { assets: [], index: 0 },
@@ -27,23 +34,58 @@ function selectedAsset(category) {
   return state.assets[state.index];
 }
 
+function updateLivePreview() {
+  const body = selectedAsset("body");
+  const eyes = selectedAsset("eyes");
+  const mouth = selectedAsset("mouth");
+
+  livePreview.querySelector(".stack").style.width = `${sizeInput.value}px`;
+  livePreview.querySelector(".stack").style.height = `${sizeInput.value}px`;
+
+  previewName.textContent = usernameInput.value.trim() || "Preview";
+
+  if (body) {
+    previewBody.src = `/asset/body/${encodeURIComponent(body)}`;
+    previewBody.style.display = "block";
+  } else {
+    previewBody.style.display = "none";
+  }
+
+  if (eyes) {
+    previewEyes.src = `/asset/eyes/${encodeURIComponent(eyes)}`;
+    previewEyes.style.display = "block";
+  } else {
+    previewEyes.style.display = "none";
+  }
+
+  if (mouth) {
+    previewMouth.src = `/asset/mouth/${encodeURIComponent(mouth)}`;
+    previewMouth.style.display = "block";
+  } else {
+    previewMouth.style.display = "none";
+  }
+
+  previewBody.style.filter = `hue-rotate(${hueInput.value}deg) saturate(${saturationInput.value}%) brightness(${brightnessInput.value}%)`;
+}
+
 function renderSelector(category) {
-  const state = selectorState[category];
   const root = document.querySelector(`.selector[data-category='${category}']`);
   const label = root.querySelector(".label");
   const preview = root.querySelector(".preview");
 
   const file = selectedAsset(category);
   if (!file) {
-    label.textContent = "No PNGs found";
+    label.textContent = "None";
     preview.removeAttribute("src");
     preview.style.visibility = "hidden";
+    updateLivePreview();
     return;
   }
 
   label.textContent = file;
   preview.style.visibility = "visible";
   preview.src = `/asset/${category}/${encodeURIComponent(file)}`;
+  updateLivePreview();
 }
 
 function wireSelectorArrows() {
@@ -101,12 +143,12 @@ form.addEventListener("submit", async (event) => {
 
   const body = selectedAsset("body");
   if (!body) {
-    alert("Add at least one 256x256 body PNG to ./Body before submitting.");
+    alert("No body is available.");
     return;
   }
 
   const payload = {
-    username: document.querySelector("#username").value,
+    username: usernameInput.value,
     body,
     eyes: selectedAsset("eyes"),
     mouth: selectedAsset("mouth"),
@@ -131,11 +173,15 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-for (const input of [hueInput, saturationInput, brightnessInput, sizeInput, speedInput]) {
-  input.addEventListener("input", updateValueDisplays);
+for (const input of [hueInput, saturationInput, brightnessInput, sizeInput, speedInput, usernameInput]) {
+  input.addEventListener("input", () => {
+    updateValueDisplays();
+    updateLivePreview();
+  });
 }
 
 wireSelectorArrows();
 updateValueDisplays();
+updateLivePreview();
 loadObsStatus();
 loadAssets();
