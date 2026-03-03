@@ -1,7 +1,7 @@
 # OBS Character Web App (Python)
 
 Flask + Socket.IO app where users customize a layered PNG character from a web UI and submit by username.
-The character appears in an OBS Browser Source overlay at the bottom of the screen and moves left/right.
+The character appears in an OBS Browser Source overlay at the bottom of the screen and hops like a slime.
 
 ## Character assets
 
@@ -98,7 +98,7 @@ To let users open the panel without `:PORT` in the URL:
 
 This app uses relative URLs in the frontend, so users do not need to append a port when visiting through Playit.
 
-Admin page supports picking up porgu with click+hold, throwing with cursor velocity, and right-click removal. Movements are broadcast live to overlay clients.
+Admin page supports picking up porgu with click+hold, throwing with cursor velocity, ceiling/wall bounce, and right-click removal. Physics runs server-side in a fixed 1920x1080 world, so OBS and admin stay synced even when the admin page is closed.
 
 ### Proxy headers
 

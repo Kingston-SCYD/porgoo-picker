@@ -1,16 +1,14 @@
 const socket = io();
 const overlay = document.querySelector("#overlay");
 
+const WORLD_WIDTH = 1920;
+const WORLD_HEIGHT = 1080;
+
 const state = {
   entities: new Map(),
-  lastTimestamp: performance.now(),
 };
 
-function randomJumpDelay() {
-  return 0.9 + Math.random() * 0.8;
-}
-
-function createEntity(char, width) {
+function createEntity(char) {
   const node = document.createElement("div");
   node.className = "character";
 
@@ -40,22 +38,7 @@ function createEntity(char, width) {
   node.appendChild(name);
   overlay.appendChild(node);
 
-  return {
-    node,
-    facing,
-    stack,
-    body,
-    eyes,
-    mouth,
-    name,
-    x: Math.random() * Math.max(width - char.size, 1),
-    y: 0,
-    vy: 0,
-    vx: 0,
-    dir: Math.random() > 0.5 ? 1 : -1,
-    nextJumpIn: randomJumpDelay(),
-    externalUntil: 0,
-  };
+  return { node, facing, stack, body, eyes, mouth, name, x: 0, y: 0, vx: 0, vy: 0, dir: 1 };
 }
 
 function applyCharacterVisuals(entity, char) {
@@ -93,14 +76,12 @@ function upsertCharacters(characters) {
     }
   }
 
-  const width = window.innerWidth;
-
   for (const char of characters) {
     const key = char.username.toLowerCase();
     let entity = state.entities.get(key);
 
     if (!entity) {
-      entity = createEntity(char, width);
+      entity = createEntity(char);
       state.entities.set(key, entity);
     }
 
@@ -108,108 +89,55 @@ function upsertCharacters(characters) {
   }
 }
 
-function applyExternalState(update) {
-  const key = (update.username || "").toLowerCase();
-  const entity = state.entities.get(key);
-  if (!entity || !entity.character) return;
+function applyWorldState(entries) {
+  if (!Array.isArray(entries)) return;
+  for (const update of entries) {
+    const key = (update.username || "").toLowerCase();
+    const entity = state.entities.get(key);
+    if (!entity || !entity.character) continue;
 
-  const maxX = Math.max(window.innerWidth - entity.character.size, 0);
-  entity.x = Math.max(0, Math.min(Number(update.x) || 0, maxX));
-  entity.y = Math.min(0, Number(update.y) || 0);
-  entity.vx = Number(update.vx) || 0;
-  entity.vy = Number(update.vy) || 0;
-  entity.dir = Number(update.dir) >= 0 ? 1 : -1;
-  entity.externalUntil = performance.now() + 1600;
+    entity.x = Number(update.x) || 0;
+    entity.y = Number(update.y) || 0;
+    entity.vx = Number(update.vx) || 0;
+    entity.vy = Number(update.vy) || 0;
+    entity.dir = Number(update.dir) >= 0 ? 1 : -1;
+  }
+
+  render();
 }
 
-async function loadInitialCharacters() {
-  const response = await fetch("/api/characters");
-  const characters = await response.json();
-  upsertCharacters(characters);
-}
-
-socket.on("characters_updated", upsertCharacters);
-socket.on("character_state_updated", applyExternalState);
-
-function tick(now) {
-  const dt = Math.min((now - state.lastTimestamp) / 1000, 0.05);
-  state.lastTimestamp = now;
-
-  const width = window.innerWidth;
+function render() {
+  const scaleX = window.innerWidth / WORLD_WIDTH;
+  const scaleY = window.innerHeight / WORLD_HEIGHT;
 
   for (const entity of state.entities.values()) {
-    const { character } = entity;
-    if (!character) continue;
-
-    const maxX = Math.max(width - character.size, 0);
-
-    const underExternalControl = now < entity.externalUntil;
-    if (!underExternalControl) {
-      entity.nextJumpIn -= dt;
-      if (entity.y === 0 && entity.nextJumpIn <= 0) {
-        if (entity.x <= 0) {
-          entity.dir = 1;
-        } else if (entity.x >= maxX) {
-          entity.dir = -1;
-        }
-
-        const hopSpeed = character.speed * 105;
-        entity.vx = entity.dir * hopSpeed;
-        entity.vy = -(155 + Math.random() * 55);
-        entity.nextJumpIn = randomJumpDelay();
-      }
-    }
-
-    if (entity.y < 0 || entity.vy < 0 || Math.abs(entity.vx) > 1) {
-      entity.x += entity.vx * dt;
-    }
-
-    if (entity.x <= 0) {
-      entity.x = 0;
-      entity.dir = 1;
-      entity.vx = Math.abs(entity.vx) * 0.72;
-    } else if (entity.x >= maxX) {
-      entity.x = maxX;
-      entity.dir = -1;
-      entity.vx = -Math.abs(entity.vx) * 0.72;
-    }
-
-    entity.vy += 540 * dt;
-    entity.y += entity.vy * dt;
-
-    if (entity.y > 0) {
-      entity.y = 0;
-      entity.vy = 0;
-      entity.vx *= 0.45;
-    }
-
-    if (entity.y === 0) {
-      entity.vx *= Math.pow(0.12, dt);
-      if (Math.abs(entity.vx) < 2.5) {
-        entity.vx = 0;
-      }
-    }
-
     const rising = Math.max(-entity.vy / 240, 0);
     const falling = Math.max(entity.vy / 260, 0);
     const squishX = Math.max(0.9, Math.min(1.1, 1 + rising * 0.03 - falling * 0.05));
     const squishY = Math.max(0.9, Math.min(1.1, 1 - rising * 0.05 + falling * 0.07));
 
-    entity.node.style.transform = `translate(${entity.x}px, ${entity.y}px)`;
+    const px = entity.x * scaleX;
+    const py = entity.y * scaleY;
+
+    entity.node.style.transform = `translate(${px}px, ${py}px)`;
     entity.facing.style.transform = `scaleX(${entity.dir === 1 ? -1 : 1})`;
     entity.stack.style.transform = `scale(${squishX}, ${squishY})`;
   }
-
-  requestAnimationFrame(tick);
 }
 
-window.addEventListener("resize", () => {
-  const width = window.innerWidth;
-  for (const entity of state.entities.values()) {
-    const size = entity.character?.size || 0;
-    entity.x = Math.max(0, Math.min(entity.x, width - size));
-  }
-});
+window.addEventListener("resize", render);
+
+async function loadInitialCharacters() {
+  const response = await fetch("/api/characters");
+  const characters = await response.json();
+  upsertCharacters(characters);
+
+  const worldResponse = await fetch("/api/world-state");
+  const worldState = await worldResponse.json();
+  applyWorldState(worldState);
+}
+
+socket.on("characters_updated", upsertCharacters);
+socket.on("world_state", applyWorldState);
 
 loadInitialCharacters();
-requestAnimationFrame(tick);

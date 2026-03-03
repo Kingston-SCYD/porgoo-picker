@@ -134,7 +134,7 @@ button {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 280px;
+  height: 100vh;
   pointer-events: none;
 }
 

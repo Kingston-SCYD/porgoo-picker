@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import math
 import os
+import random
+import re
+import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from threading import Lock
 from typing import Dict, List
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -14,16 +16,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 try:
     from obsws_python import ReqClient
-except Exception:  # dependency might not be installed yet in local env
+except Exception:  # pragma: no cover - optional dependency at runtime
     ReqClient = None
-
-
-BASE_DIR = Path(__file__).resolve().parent
-ASSET_DIRS = {
-    "body": BASE_DIR / "Body",
-    "eyes": BASE_DIR / "eyes",
-    "mouth": BASE_DIR / "mouth",
-}
 
 
 @dataclass
@@ -35,61 +29,80 @@ class Character:
     hue: int
     saturation: int
     brightness: int
-    size: int = 75
-    speed: float = 1.2
+    size: int
+    speed: float
 
+
+BASE_DIR = Path(__file__).resolve().parent
+ASSET_DIRS = {
+    "body": BASE_DIR / "Body",
+    "eyes": BASE_DIR / "eyes",
+    "mouth": BASE_DIR / "mouth",
+}
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret")
-
-TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "1").strip().lower() in {"1", "true", "yes", "on"}
-if TRUST_PROXY_HEADERS:
+if os.getenv("TRUST_PROXY_HEADERS", "1").strip().lower() in {"1", "true", "yes", "on"}:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
-
-SOCKETIO_ASYNC_MODE = os.getenv("SOCKETIO_ASYNC_MODE", "threading").strip() or "threading"
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode=SOCKETIO_ASYNC_MODE)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode=os.getenv("SOCKETIO_ASYNC_MODE", "threading").strip() or "threading",
+)
 
 characters: Dict[str, Character] = {}
-characters_lock = Lock()
-
-MIN_SUBMIT_INTERVAL_SECONDS = float(os.getenv("MIN_SUBMIT_INTERVAL_SECONDS", "1.5"))
-
-DEFAULT_BLOCKED_SUBSTRINGS = [
-    "fuck",
-    "shit",
-    "bitch",
-    "asshole",
-    "bastard",
-    "cunt",
-    "whore",
-    "slut",
-    "nigger",
-    "faggot",
-    "kike",
-    "spic",
-    "chink",
-    "retard",
-]
-
-blocked_name_substrings = [
-    term.strip().lower()
-    for term in os.getenv("OFFENSIVE_NAME_SUBSTRINGS", ",".join(DEFAULT_BLOCKED_SUBSTRINGS)).split(",")
-    if term.strip()
-]
+characters_lock = threading.Lock()
 
 creator_username_registry: Dict[str, str] = {}
 creator_last_submit_at: Dict[str, float] = {}
-submission_lock = Lock()
+submission_lock = threading.Lock()
+
+WORLD_WIDTH = 1920
+WORLD_HEIGHT = 1080
+GRAVITY = 540.0
+BOUNCE_DAMPING = 0.72
+CEILING_BOUNCE_DAMPING = 0.62
+GROUND_SLIDE_MULTIPLIER = 0.45
+GROUND_DRAG_BASE = 0.12
+MIN_SUBMIT_INTERVAL_SECONDS = float(os.getenv("MIN_SUBMIT_INTERVAL_SECONDS", "0.8"))
+
+character_states: Dict[str, dict] = {}
+state_lock = threading.Lock()
+physics_thread_started = False
+
+OFFENSIVE_NAME_SUBSTRINGS_DEFAULT = [
+    "nigger", "nigga", "faggot", "fag", "kike", "chink", "spic", "wetback",
+    "retard", "tranny", "cunt", "whore", "slut", "hitler", "naz", "rape",
+]
+blocked_name_substrings = [
+    term.strip().lower() for term in os.getenv("OFFENSIVE_NAME_SUBSTRINGS", ",".join(OFFENSIVE_NAME_SUBSTRINGS_DEFAULT)).split(",") if term.strip()
+]
+
+LEET_TRANSLATION = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
+
+
+OBS_CONFIG = {
+    "host": os.getenv("OBS_HOST", "localhost"),
+    "port": int(os.getenv("OBS_PORT", "4455")),
+    "password": os.getenv("OBS_PASSWORD", ""),
+    "timeout": float(os.getenv("OBS_TIMEOUT", "3")),
+}
+
+
+def get_creator_ip() -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if forwarded_for:
+        return forwarded_for
+    return (request.remote_addr or "unknown").strip()
 
 
 def get_creator_key() -> str:
-    forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    ip = forwarded_for or request.remote_addr or "unknown"
-    user_agent = request.headers.get("User-Agent", "unknown")
+    ip = get_creator_ip().lower()
+    user_agent = (request.headers.get("User-Agent") or "unknown").strip().lower()
     return f"{ip}|{user_agent}"
 
 
-LEET_TRANSLATION = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
+def normalize_username_key(username: str) -> str:
+    return username.strip().lower()
 
 
 def normalize_username_for_filter(username: str) -> str:
@@ -119,15 +132,6 @@ def enforce_submission_limits(creator_key: str, username_key: str) -> str | None
     return None
 
 
-
-OBS_CONFIG = {
-    "host": os.getenv("OBS_HOST", "localhost"),
-    "port": int(os.getenv("OBS_PORT", "4455")),
-    "password": os.getenv("OBS_PASSWORD", ""),
-    "timeout": float(os.getenv("OBS_TIMEOUT", "3")),
-}
-
-
 def list_pngs(category: str) -> List[str]:
     directory = ASSET_DIRS[category]
     if not directory.exists():
@@ -138,16 +142,11 @@ def list_pngs(category: str) -> List[str]:
 def get_obs_status() -> dict:
     if ReqClient is None:
         return {"connected": False, "error": "obsws-python not installed"}
-
     try:
         client = ReqClient(**OBS_CONFIG)
         version = client.get_version()
-        return {
-            "connected": True,
-            "obs_version": version.obs_version,
-            "websocket_version": version.obs_web_socket_version,
-        }
-    except Exception as exc:  # pragma: no cover - runtime integration check
+        return {"connected": True, "obs_version": version.obs_version, "websocket_version": version.obs_web_socket_version}
+    except Exception as exc:  # pragma: no cover
         return {"connected": False, "error": str(exc)}
 
 
@@ -155,7 +154,6 @@ def get_ssl_context() -> str | tuple[str, str] | None:
     cert_file = os.getenv("SSL_CERT_FILE", "").strip()
     key_file = os.getenv("SSL_KEY_FILE", "").strip()
     use_adhoc = os.getenv("SSL_ADHOC", "0").strip().lower() in {"1", "true", "yes", "on"}
-
     if cert_file and key_file:
         return (cert_file, key_file)
     if use_adhoc:
@@ -166,10 +164,8 @@ def get_ssl_context() -> str | tuple[str, str] | None:
 def build_socketio_run_kwargs(port: int) -> dict:
     ssl_context = get_ssl_context()
     run_kwargs = {"host": "0.0.0.0", "port": port}
-
     if socketio.async_mode == "threading":
         run_kwargs["allow_unsafe_werkzeug"] = True
-
     if isinstance(ssl_context, tuple):
         cert_file, key_file = ssl_context
         run_kwargs["certfile"] = cert_file
@@ -178,12 +174,142 @@ def build_socketio_run_kwargs(port: int) -> dict:
         if socketio.async_mode == "threading":
             run_kwargs["ssl_context"] = "adhoc"
         else:
-            raise RuntimeError(
-                "SSL_ADHOC requires SOCKETIO_ASYNC_MODE=threading. "
-                "Use SSL_CERT_FILE/SSL_KEY_FILE for eventlet/gevent."
-            )
-
+            raise RuntimeError("SSL_ADHOC requires SOCKETIO_ASYNC_MODE=threading. Use SSL_CERT_FILE/SSL_KEY_FILE for eventlet/gevent.")
     return run_kwargs
+
+
+def random_jump_delay() -> float:
+    return 0.9 + random.random() * 0.8
+
+
+def create_state_for_character(username_key: str, character: Character) -> dict:
+    max_x = max(WORLD_WIDTH - character.size, 0)
+    return {
+        "username": character.username,
+        "x": random.random() * max_x,
+        "y": 0.0,
+        "vx": 0.0,
+        "vy": 0.0,
+        "dir": 1 if random.random() > 0.5 else -1,
+        "next_jump_in": random_jump_delay(),
+        "grabbed": False,
+    }
+
+
+def ensure_character_states_locked() -> None:
+    for username_key, character in characters.items():
+        if username_key not in character_states:
+            character_states[username_key] = create_state_for_character(username_key, character)
+        else:
+            character_states[username_key]["username"] = character.username
+
+    stale = [key for key in character_states if key not in characters]
+    for key in stale:
+        character_states.pop(key, None)
+
+
+def serialize_world_state() -> list[dict]:
+    with characters_lock, state_lock:
+        ensure_character_states_locked()
+        snapshot = []
+        for username_key, state in character_states.items():
+            character = characters.get(username_key)
+            if not character:
+                continue
+            snapshot.append({
+                "username": character.username,
+                "size": character.size,
+                "x": state["x"],
+                "y": state["y"],
+                "vx": state["vx"],
+                "vy": state["vy"],
+                "dir": state["dir"],
+            })
+    return snapshot
+
+
+def emit_world_state() -> None:
+    socketio.emit("world_state", serialize_world_state())
+
+
+def physics_loop() -> None:
+    last = time.perf_counter()
+    emit_accum = 0.0
+    while True:
+        now = time.perf_counter()
+        dt = min(now - last, 0.05)
+        last = now
+        with characters_lock, state_lock:
+            ensure_character_states_locked()
+            for key, character in characters.items():
+                state = character_states[key]
+                size = character.size
+                max_x = max(WORLD_WIDTH - size, 0)
+                ceiling_y = -(WORLD_HEIGHT - size)
+                if state["grabbed"]:
+                    continue
+
+                state["next_jump_in"] -= dt
+                if state["y"] == 0 and state["next_jump_in"] <= 0:
+                    if state["x"] <= 0:
+                        state["dir"] = 1
+                    elif state["x"] >= max_x:
+                        state["dir"] = -1
+                    hop_speed = character.speed * 105
+                    state["vx"] = state["dir"] * hop_speed
+                    state["vy"] = -(155 + random.random() * 55)
+                    state["next_jump_in"] = random_jump_delay()
+
+                if state["y"] < 0 or state["vy"] < 0 or abs(state["vx"]) > 1:
+                    state["x"] += state["vx"] * dt
+
+                if state["x"] <= 0:
+                    state["x"] = 0
+                    state["dir"] = 1
+                    state["vx"] = abs(state["vx"]) * BOUNCE_DAMPING
+                elif state["x"] >= max_x:
+                    state["x"] = max_x
+                    state["dir"] = -1
+                    state["vx"] = -abs(state["vx"]) * BOUNCE_DAMPING
+
+                state["vy"] += GRAVITY * dt
+                state["y"] += state["vy"] * dt
+
+                if state["y"] < ceiling_y:
+                    state["y"] = ceiling_y
+                    state["vy"] = abs(state["vy"]) * CEILING_BOUNCE_DAMPING
+
+                if state["y"] > 0:
+                    state["y"] = 0
+                    state["vy"] = 0
+                    state["vx"] *= GROUND_SLIDE_MULTIPLIER
+
+                if state["y"] == 0:
+                    state["vx"] *= math.pow(GROUND_DRAG_BASE, dt)
+                    if abs(state["vx"]) < 2.5:
+                        state["vx"] = 0
+
+        emit_accum += dt
+        if emit_accum >= 1 / 30:
+            emit_world_state()
+            emit_accum = 0.0
+        socketio.sleep(1 / 120)
+
+
+def ensure_physics_thread_started() -> None:
+    global physics_thread_started
+    if physics_thread_started:
+        return
+    physics_thread_started = True
+    socketio.start_background_task(physics_loop)
+
+
+USERNAME_ALLOWED_RE = re.compile(r"^[A-Za-z0-9 _.-]{2,20}$")
+
+
+@app.before_request
+def _start_physics_once() -> None:
+    ensure_physics_thread_started()
 
 
 @app.get("/")
@@ -214,11 +340,7 @@ def get_links():
 
 @app.get("/api/assets")
 def get_assets():
-    return jsonify({
-        "body": list_pngs("body"),
-        "eyes": list_pngs("eyes"),
-        "mouth": list_pngs("mouth"),
-    })
+    return jsonify({"body": list_pngs("body"), "eyes": list_pngs("eyes"), "mouth": list_pngs("mouth")})
 
 
 @app.get("/api/my-character")
@@ -235,6 +357,18 @@ def get_my_character():
         return jsonify({"locked": True, "username": username_key, "character": None})
 
     return jsonify({"locked": True, "username": character.username, "character": asdict(character)})
+
+
+@app.get("/api/characters")
+def get_characters():
+    with characters_lock:
+        serialized = [asdict(char) for char in characters.values()]
+    return jsonify(serialized)
+
+
+@app.get("/api/world-state")
+def get_world_state():
+    return jsonify(serialize_world_state())
 
 
 @app.get("/asset/<category>/<path:filename>")
@@ -270,10 +404,12 @@ def add_or_update_character():
 
     if not username:
         return jsonify({"error": "username is required"}), 400
+    if not USERNAME_ALLOWED_RE.fullmatch(username):
+        return jsonify({"error": "username can only use letters, numbers, spaces, dots, dashes, and underscores"}), 400
     if has_offensive_username(username):
         return jsonify({"error": "username contains blocked language"}), 400
 
-    username_key = username.lower()
+    username_key = normalize_username_key(username)
     if not body:
         return jsonify({"error": "body png is required"}), 400
     if body not in list_pngs("body"):
@@ -296,31 +432,27 @@ def add_or_update_character():
     if limit_error:
         return jsonify({"error": limit_error}), 429
 
-    character = Character(
-        username=username,
-        body=body,
-        eyes=eyes,
-        mouth=mouth,
-        hue=hue,
-        saturation=saturation,
-        brightness=brightness,
-        size=size,
-        speed=speed,
-    )
+    character = Character(username=username, body=body, eyes=eyes, mouth=mouth, hue=hue, saturation=saturation, brightness=brightness, size=size, speed=speed)
 
-    with characters_lock:
+    with characters_lock, state_lock:
+        existing_state = character_states.get(username_key)
         characters[username_key] = character
+        if existing_state is None:
+            character_states[username_key] = create_state_for_character(username_key, character)
+        else:
+            existing_state["username"] = character.username
+
         serialized = [asdict(char) for char in characters.values()]
 
     socketio.emit("characters_updated", serialized)
+    emit_world_state()
     return jsonify({"message": "character upserted", "character": asdict(character)})
 
 
-@app.get("/api/characters")
-def get_characters():
-    with characters_lock:
-        serialized = [asdict(char) for char in characters.values()]
-    return jsonify(serialized)
+@socketio.on("connect")
+def on_connect():
+    ensure_physics_thread_started()
+    emit_world_state()
 
 
 @socketio.on("admin_update_character_state")
@@ -331,29 +463,39 @@ def admin_update_character_state(payload):
     username = str(payload.get("username", "")).strip()
     if not username:
         return
+    username_key = username.lower()
 
-    values = {}
-    for key in ["x", "y", "vx", "vy", "dir"]:
-        value = payload.get(key)
-        if not isinstance(value, (int, float)) or not math.isfinite(value):
-            return
-        values[key] = float(value)
-
-    with characters_lock:
-        if username.lower() not in characters:
+    with characters_lock, state_lock:
+        character = characters.get(username_key)
+        entity = character_states.get(username_key)
+        if not character or not entity:
             return
 
-    socketio.emit(
-        "character_state_updated",
-        {
-            "username": username,
-            "x": values["x"],
-            "y": values["y"],
-            "vx": values["vx"],
-            "vy": values["vy"],
-            "dir": 1 if values["dir"] >= 0 else -1,
-        },
-    )
+        size = character.size
+        max_x = max(WORLD_WIDTH - size, 0)
+        ceiling_y = -(WORLD_HEIGHT - size)
+
+        def num(name: str, default: float = 0.0) -> float:
+            value = payload.get(name, default)
+            if not isinstance(value, (int, float)) or not math.isfinite(value):
+                return default
+            return float(value)
+
+        entity["x"] = max(0.0, min(num("x", entity["x"]), max_x))
+        entity["y"] = max(ceiling_y, min(num("y", entity["y"]), 0.0))
+        entity["vx"] = max(-1400.0, min(num("vx", entity["vx"]), 1400.0))
+        entity["vy"] = max(-1400.0, min(num("vy", entity["vy"]), 1400.0))
+        entity["dir"] = 1 if num("dir", entity["dir"]) >= 0 else -1
+
+        if payload.get("grabbed") is True:
+            entity["grabbed"] = True
+            entity["vx"] = 0.0
+            entity["vy"] = 0.0
+        elif payload.get("grabbed") is False:
+            entity["grabbed"] = False
+            entity["next_jump_in"] = max(entity.get("next_jump_in", 0.0), 0.35)
+
+    emit_world_state()
 
 
 @socketio.on("admin_remove_character")
@@ -365,15 +507,18 @@ def admin_remove_character(payload):
     if not username:
         return
 
-    with characters_lock:
+    with characters_lock, state_lock:
         removed = characters.pop(username.lower(), None)
         if removed is None:
             return
+        character_states.pop(username.lower(), None)
         serialized = [asdict(char) for char in characters.values()]
 
     socketio.emit("characters_updated", serialized)
+    emit_world_state()
 
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
+    ensure_physics_thread_started()
     socketio.run(app, **build_socketio_run_kwargs(port))
