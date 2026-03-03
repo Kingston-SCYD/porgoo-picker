@@ -17,17 +17,16 @@ body {
 }
 
 .card {
-  width: min(680px, 92vw);
+  width: min(760px, 94vw);
   background: #1d2640;
   border: 1px solid #2f3f69;
   border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 }
 
 .form {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.8rem;
 }
 
 label {
@@ -37,7 +36,6 @@ label {
 }
 
 input,
-select,
 button {
   font: inherit;
 }
@@ -50,6 +48,47 @@ button {
   font-weight: 800;
   padding: 0.7rem 1rem;
   cursor: pointer;
+}
+
+.selector-group {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.selector-title {
+  font-weight: 700;
+}
+
+.selector {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.arrow {
+  height: 42px;
+  border-radius: 999px;
+  font-size: 1.05rem;
+  padding: 0;
+}
+
+.center-box {
+  border: 1px solid #40558c;
+  border-radius: 12px;
+  background: #121a2d;
+  min-height: 96px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.2rem;
+  padding: 0.45rem;
+}
+
+.preview {
+  width: 64px;
+  height: 64px;
+  image-rendering: pixelated;
 }
 
 .small {
@@ -70,7 +109,6 @@ button {
   color: #ff9a9a;
 }
 
-/* Overlay page */
 .overlay-page {
   background: transparent;
   overflow: hidden;
@@ -81,7 +119,7 @@ button {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 190px;
+  height: 280px;
   pointer-events: none;
 }
 
@@ -94,44 +132,19 @@ button {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.65);
 }
 
-.avatar {
+.stack {
   position: relative;
-  box-shadow: 0 7px 15px rgba(0, 0, 0, 0.35);
 }
 
-.avatar.blob {
-  border-radius: 55% 45% 60% 40%;
-}
-
-.avatar.square {
-  border-radius: 8px;
-}
-
-.avatar.cat {
-  border-radius: 40%;
-}
-
-.avatar.cat::before,
-.avatar.cat::after {
-  content: "";
+.layer {
   position: absolute;
-  width: 36%;
-  height: 36%;
-  top: -14%;
-  background: inherit;
-  clip-path: polygon(50% 0, 0 100%, 100% 100%);
-}
-
-.avatar.cat::before {
-  left: 6%;
-}
-
-.avatar.cat::after {
-  right: 6%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .name {
-  margin-top: 0.3rem;
+  margin-top: calc(100% + 0.35rem);
   font-weight: 700;
   font-size: 0.9rem;
 }

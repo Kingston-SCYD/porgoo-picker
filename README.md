@@ -1,16 +1,29 @@
 # OBS Character Web App (Python)
 
-A small Flask + Socket.IO app that:
+Flask + Socket.IO app where users customize a layered PNG character from a web UI and submit by username.
+The character appears in an OBS Browser Source overlay at the bottom of the screen and moves left/right.
 
-1. Shows a web UI where users submit a username and character customization.
-2. Stores/submits those characters in real time.
-3. Provides an `/overlay` page for OBS Browser Source that draws characters at the bottom of the screen and makes them move back and forth.
-4. Checks OBS WebSocket connectivity from Python.
+## Character assets
+
+Put 256x256 transparent PNG files in the app directory:
+
+- `Body/` (required; base body PNG, typically bright red so H/S/B tinting is obvious)
+- `eyes/` (optional overlay layer)
+- `mouth/` (optional overlay layer)
+
+The UI provides left/right arrow selectors with a center preview box for each layer.
+
+## Controls
+
+- Username
+- Body / Eyes / Mouth selection via arrows
+- Hue, Saturation, Brightness sliders (applied to body layer)
+- Size and speed sliders
 
 ## Requirements
 
 - Python 3.10+
-- OBS Studio with **obs-websocket** enabled (OBS 28+ has it built-in)
+- OBS Studio with obs-websocket enabled (OBS 28+)
 
 ## Setup
 
@@ -20,14 +33,6 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Optional OBS environment variables:
-
-```bash
-export OBS_HOST=localhost
-export OBS_PORT=4455
-export OBS_PASSWORD='your_password_if_set'
-```
-
 ## Run
 
 ```bash
@@ -35,13 +40,6 @@ python app.py
 ```
 
 - Control UI: `http://localhost:5000/`
-- OBS Overlay URL: `http://localhost:5000/overlay`
+- Overlay URL: `http://localhost:5000/overlay`
 
-## Add to OBS
-
-1. In OBS, add a **Browser Source**.
-2. URL: `http://localhost:5000/overlay`
-3. Width/Height to match your canvas (e.g., 1920x1080).
-4. Keep source visible in your scene.
-
-Characters submitted from the control page appear instantly and animate left↔right along the bottom.
+Add the overlay URL as an OBS Browser Source in your scene.

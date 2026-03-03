@@ -10,7 +10,7 @@
     <main class="layout">
       <section class="card">
         <h1>OBS Character Controller</h1>
-        <p>Customize a character and push it to the OBS overlay.</p>
+        <p>Use 256x256 PNG layers in <code>Body/</code>, <code>eyes/</code>, and <code>mouth/</code>.</p>
 
         <div id="obs-status" class="status">Checking OBS connection…</div>
 
@@ -20,14 +20,60 @@
             <input type="text" id="username" maxlength="20" placeholder="stream_viewer123" required />
           </label>
 
+          <div class="selector-group">
+            <div class="selector-title">Body (required)</div>
+            <div class="selector" data-category="body">
+              <button type="button" class="arrow prev">◀</button>
+              <div class="center-box">
+                <img class="preview" alt="body preview" />
+                <div class="label">None</div>
+              </div>
+              <button type="button" class="arrow next">▶</button>
+            </div>
+          </div>
+
+          <div class="selector-group">
+            <div class="selector-title">Eyes</div>
+            <div class="selector" data-category="eyes">
+              <button type="button" class="arrow prev">◀</button>
+              <div class="center-box">
+                <img class="preview" alt="eyes preview" />
+                <div class="label">None</div>
+              </div>
+              <button type="button" class="arrow next">▶</button>
+            </div>
+          </div>
+
+          <div class="selector-group">
+            <div class="selector-title">Mouth</div>
+            <div class="selector" data-category="mouth">
+              <button type="button" class="arrow prev">◀</button>
+              <div class="center-box">
+                <img class="preview" alt="mouth preview" />
+                <div class="label">None</div>
+              </div>
+              <button type="button" class="arrow next">▶</button>
+            </div>
+          </div>
+
           <label>
-            Character color
-            <input type="color" id="color" value="#66ccff" />
+            Hue: <span id="hue-value">0</span>
+            <input type="range" id="hue" min="-180" max="180" value="0" />
           </label>
 
           <label>
-            Size: <span id="size-value">56</span>px
-            <input type="range" id="size" min="24" max="120" value="56" />
+            Saturation: <span id="saturation-value">100</span>%
+            <input type="range" id="saturation" min="0" max="200" value="100" />
+          </label>
+
+          <label>
+            Brightness: <span id="brightness-value">100</span>%
+            <input type="range" id="brightness" min="20" max="200" value="100" />
+          </label>
+
+          <label>
+            Size: <span id="size-value">128</span>px
+            <input type="range" id="size" min="64" max="256" value="128" />
           </label>
 
           <label>
@@ -35,21 +81,10 @@
             <input type="range" id="speed" min="0.2" max="3.0" value="1.2" step="0.1" />
           </label>
 
-          <label>
-            Style
-            <select id="style">
-              <option value="blob">Blob</option>
-              <option value="square">Square</option>
-              <option value="cat">Cat-ish</option>
-            </select>
-          </label>
-
           <button type="submit">Submit to Overlay</button>
         </form>
 
-        <p class="small">
-          Add <code>http://localhost:5000/overlay</code> as an OBS Browser Source pinned to your stream dimensions.
-        </p>
+        <p class="small">Add <code>http://localhost:5000/overlay</code> as an OBS Browser Source.</p>
       </section>
     </main>
 

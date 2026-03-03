@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from threading import Lock
-from typing import Dict
+from typing import Dict, List
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_socketio import SocketIO
 
 try:
@@ -14,13 +15,25 @@ except Exception:  # dependency might not be installed yet in local env
     ReqClient = None
 
 
+BASE_DIR = Path(__file__).resolve().parent
+ASSET_DIRS = {
+    "body": BASE_DIR / "Body",
+    "eyes": BASE_DIR / "eyes",
+    "mouth": BASE_DIR / "mouth",
+}
+
+
 @dataclass
 class Character:
     username: str
-    color: str
+    body: str
+    eyes: str
+    mouth: str
+    hue: int
+    saturation: int
+    brightness: int
     size: int
     speed: float
-    style: str
 
 
 app = Flask(__name__)
@@ -37,6 +50,13 @@ OBS_CONFIG = {
     "password": os.getenv("OBS_PASSWORD", ""),
     "timeout": float(os.getenv("OBS_TIMEOUT", "3")),
 }
+
+
+def list_pngs(category: str) -> List[str]:
+    directory = ASSET_DIRS[category]
+    if not directory.exists():
+        return []
+    return sorted([file.name for file in directory.glob("*.png") if file.is_file()])
 
 
 def get_obs_status() -> dict:
@@ -70,35 +90,77 @@ def obs_status():
     return jsonify(get_obs_status())
 
 
+@app.get("/api/assets")
+def get_assets():
+    return jsonify({
+        "body": list_pngs("body"),
+        "eyes": list_pngs("eyes"),
+        "mouth": list_pngs("mouth"),
+    })
+
+
+@app.get("/asset/<category>/<path:filename>")
+def get_asset(category: str, filename: str):
+    if category not in ASSET_DIRS:
+        return jsonify({"error": "invalid category"}), 404
+    if Path(filename).name != filename:
+        return jsonify({"error": "invalid filename"}), 400
+    if not filename.lower().endswith(".png"):
+        return jsonify({"error": "assets must be png"}), 400
+    if filename not in list_pngs(category):
+        return jsonify({"error": "asset not found"}), 404
+    return send_from_directory(ASSET_DIRS[category], filename)
+
+
 @app.post("/api/character")
 def add_or_update_character():
     payload = request.get_json(silent=True) or {}
 
     username = (payload.get("username") or "").strip()
-    color = (payload.get("color") or "#66ccff").strip()
-    style = (payload.get("style") or "blob").strip().lower()
+    body = (payload.get("body") or "").strip()
+    eyes = (payload.get("eyes") or "").strip()
+    mouth = (payload.get("mouth") or "").strip()
 
     try:
-        size = int(payload.get("size", 56))
+        hue = int(payload.get("hue", 0))
+        saturation = int(payload.get("saturation", 100))
+        brightness = int(payload.get("brightness", 100))
+        size = int(payload.get("size", 128))
         speed = float(payload.get("speed", 1.2))
     except (TypeError, ValueError):
-        return jsonify({"error": "size must be int and speed must be numeric"}), 400
+        return jsonify({"error": "numeric fields contain invalid values"}), 400
 
     if not username:
         return jsonify({"error": "username is required"}), 400
-    if size < 24 or size > 120:
-        return jsonify({"error": "size must be between 24 and 120"}), 400
-    if speed < 0.2 or speed > 3.0:
+    if not body:
+        return jsonify({"error": "body png is required"}), 400
+    if body not in list_pngs("body"):
+        return jsonify({"error": "invalid body asset"}), 400
+    if eyes and eyes not in list_pngs("eyes"):
+        return jsonify({"error": "invalid eyes asset"}), 400
+    if mouth and mouth not in list_pngs("mouth"):
+        return jsonify({"error": "invalid mouth asset"}), 400
+    if not (-180 <= hue <= 180):
+        return jsonify({"error": "hue must be between -180 and 180"}), 400
+    if not (0 <= saturation <= 200):
+        return jsonify({"error": "saturation must be between 0 and 200"}), 400
+    if not (20 <= brightness <= 200):
+        return jsonify({"error": "brightness must be between 20 and 200"}), 400
+    if not (64 <= size <= 256):
+        return jsonify({"error": "size must be between 64 and 256"}), 400
+    if not (0.2 <= speed <= 3.0):
         return jsonify({"error": "speed must be between 0.2 and 3.0"}), 400
-    if style not in {"blob", "square", "cat"}:
-        return jsonify({"error": "style must be blob, square, or cat"}), 400
 
     character = Character(
         username=username,
-        color=color,
+        body=body,
+        eyes=eyes,
+        mouth=mouth,
+        hue=hue,
+        saturation=saturation,
+        brightness=brightness,
         size=size,
         speed=speed,
-        style=style,
     )
 
     with characters_lock:

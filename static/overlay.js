@@ -9,7 +9,6 @@ const state = {
 function upsertCharacters(characters) {
   const nextKeys = new Set(characters.map((char) => char.username.toLowerCase()));
 
-  // Remove old
   for (const [key, value] of state.entities.entries()) {
     if (!nextKeys.has(key)) {
       value.node.remove();
@@ -27,19 +26,34 @@ function upsertCharacters(characters) {
       const node = document.createElement("div");
       node.className = "character";
 
-      const avatar = document.createElement("div");
-      avatar.className = `avatar ${char.style}`;
-      node.appendChild(avatar);
+      const stack = document.createElement("div");
+      stack.className = "stack";
+
+      const body = document.createElement("img");
+      body.className = "layer body";
+      stack.appendChild(body);
+
+      const eyes = document.createElement("img");
+      eyes.className = "layer eyes";
+      stack.appendChild(eyes);
+
+      const mouth = document.createElement("img");
+      mouth.className = "layer mouth";
+      stack.appendChild(mouth);
 
       const name = document.createElement("div");
       name.className = "name";
-      node.appendChild(name);
 
+      node.appendChild(stack);
+      node.appendChild(name);
       overlay.appendChild(node);
 
       entity = {
         node,
-        avatar,
+        stack,
+        body,
+        eyes,
+        mouth,
         name,
         x: Math.random() * Math.max(width - char.size, 1),
         dir: Math.random() > 0.5 ? 1 : -1,
@@ -49,10 +63,26 @@ function upsertCharacters(characters) {
     }
 
     entity.character = char;
-    entity.avatar.style.background = char.color;
-    entity.avatar.style.width = `${char.size}px`;
-    entity.avatar.style.height = `${char.size}px`;
-    entity.avatar.className = `avatar ${char.style}`;
+    entity.stack.style.width = `${char.size}px`;
+    entity.stack.style.height = `${char.size}px`;
+
+    entity.body.src = `/asset/body/${encodeURIComponent(char.body)}`;
+    entity.body.style.filter = `hue-rotate(${char.hue}deg) saturate(${char.saturation}%) brightness(${char.brightness}%)`;
+
+    if (char.eyes) {
+      entity.eyes.src = `/asset/eyes/${encodeURIComponent(char.eyes)}`;
+      entity.eyes.style.display = "block";
+    } else {
+      entity.eyes.style.display = "none";
+    }
+
+    if (char.mouth) {
+      entity.mouth.src = `/asset/mouth/${encodeURIComponent(char.mouth)}`;
+      entity.mouth.style.display = "block";
+    } else {
+      entity.mouth.style.display = "none";
+    }
+
     entity.name.textContent = char.username;
   }
 }
