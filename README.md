@@ -56,10 +56,14 @@ Add the overlay URL as an OBS Browser Source in your scene.
 
 You can run the panel over HTTPS in two ways:
 
+By default, the app uses `SOCKETIO_ASYNC_MODE=threading`, which supports `SSL_ADHOC=1`.
+
 - **Provided certificate files**
   - Set `SSL_CERT_FILE` and `SSL_KEY_FILE` to your cert/key paths.
+  - Works with `threading` and `eventlet` async modes.
 - **Adhoc self-signed certificate**
   - Set `SSL_ADHOC=1` (good for quick testing).
+  - Requires `SOCKETIO_ASYNC_MODE=threading`.
 
 Example with cert files:
 
@@ -76,3 +80,7 @@ SSL_ADHOC=1 python app.py
 ```
 
 When HTTPS is enabled, use `https://...` URLs in your browser source and panel links.
+
+If you force `SOCKETIO_ASYNC_MODE=eventlet`, use `SSL_CERT_FILE` + `SSL_KEY_FILE` instead of `SSL_ADHOC`.
+
+When running in default `threading` mode, the app passes `allow_unsafe_werkzeug=True` for local/self-hosted runs.
