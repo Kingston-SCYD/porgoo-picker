@@ -15,7 +15,7 @@ The UI provides left/right arrow selectors with a center preview box for each la
 
 ## Controls
 
-- Username
+- Username (locks per device fingerprint after first successful submit)
 - Body / Eyes / Mouth selection via arrows
 - Hue, Saturation, Brightness sliders (applied to body layer)
 - Speed slider (character size is fixed at 75px)
@@ -48,3 +48,5 @@ Add the overlay URL as an OBS Browser Source in your scene.
 
 - Each device fingerprint (IP + User-Agent) can only use one username per app run.
 - Usernames containing offensive/slur substrings are rejected (customizable via `OFFENSIVE_NAME_SUBSTRINGS`).
+
+- On refresh, the app restores your locked username and latest submitted character design for that fingerprint.

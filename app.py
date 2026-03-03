@@ -167,6 +167,22 @@ def get_assets():
     })
 
 
+@app.get("/api/my-character")
+def get_my_character():
+    creator_key = get_creator_key()
+    username_key = creator_username_registry.get(creator_key)
+    if not username_key:
+        return jsonify({"locked": False, "username": "", "character": None})
+
+    with characters_lock:
+        character = characters.get(username_key)
+
+    if character is None:
+        return jsonify({"locked": True, "username": username_key, "character": None})
+
+    return jsonify({"locked": True, "username": character.username, "character": asdict(character)})
+
+
 @app.get("/asset/<category>/<path:filename>")
 def get_asset(category: str, filename: str):
     if category not in ASSET_DIRS:

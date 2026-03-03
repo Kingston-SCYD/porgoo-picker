@@ -40,6 +40,13 @@ button {
   font: inherit;
 }
 
+input.locked-username,
+input:disabled {
+  background: #2c3656;
+  color: #aab7de;
+  cursor: not-allowed;
+}
+
 button {
   border: none;
   border-radius: 10px;

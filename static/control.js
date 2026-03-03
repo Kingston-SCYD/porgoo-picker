@@ -23,6 +23,14 @@ const selectorState = {
   mouth: { assets: [], index: 0 },
 };
 
+function lockUsername(username) {
+  const value = (username || "").trim();
+  if (!value) return;
+  usernameInput.value = value;
+  usernameInput.disabled = true;
+  usernameInput.classList.add("locked-username");
+}
+
 function updateValueDisplays() {
   document.querySelector("#hue-value").textContent = hueInput.value;
   document.querySelector("#saturation-value").textContent = saturationInput.value;
@@ -36,10 +44,37 @@ function selectedAsset(category) {
   return state.assets[state.index];
 }
 
+function selectAssetByName(category, filename) {
+  const state = selectorState[category];
+  if (!filename || !state.assets.length) return;
+  const foundIndex = state.assets.indexOf(filename);
+  if (foundIndex >= 0) {
+    state.index = foundIndex;
+  }
+}
+
 function stepCategory(category, direction) {
   const state = selectorState[category];
   if (!state.assets.length) return;
   state.index = (state.index + direction + state.assets.length) % state.assets.length;
+  updateLivePreview();
+}
+
+function applyCharacterToForm(character) {
+  if (!character) return;
+
+  lockUsername(character.username);
+
+  hueInput.value = character.hue ?? 0;
+  saturationInput.value = character.saturation ?? 100;
+  brightnessInput.value = character.brightness ?? 100;
+  speedInput.value = character.speed ?? 1.2;
+
+  selectAssetByName("body", character.body);
+  selectAssetByName("eyes", character.eyes);
+  selectAssetByName("mouth", character.mouth);
+
+  updateValueDisplays();
   updateLivePreview();
 }
 
@@ -100,6 +135,26 @@ async function loadAssets() {
   updateLivePreview();
 }
 
+async function loadMyCharacter() {
+  try {
+    const response = await fetch("/api/my-character");
+    if (!response.ok) return;
+    const data = await response.json();
+
+    if (data.locked && data.username) {
+      lockUsername(data.username);
+    }
+
+    if (data.character) {
+      applyCharacterToForm(data.character);
+    } else {
+      updateLivePreview();
+    }
+  } catch (error) {
+    // no-op: this should not block the rest of the page behavior
+  }
+}
+
 async function loadObsStatus() {
   try {
     const response = await fetch("/api/obs-status");
@@ -145,6 +200,8 @@ form.addEventListener("submit", async (event) => {
   });
 
   if (response.ok) {
+    lockUsername(usernameInput.value);
+    updateLivePreview();
     alert("Character added/updated in overlay.");
   } else {
     const data = await response.json();
@@ -159,8 +216,13 @@ for (const input of [hueInput, saturationInput, brightnessInput, speedInput, use
   });
 }
 
-wireArrows();
-updateValueDisplays();
-updateLivePreview();
-loadObsStatus();
-loadAssets();
+async function init() {
+  wireArrows();
+  updateValueDisplays();
+  updateLivePreview();
+  await loadAssets();
+  await loadMyCharacter();
+  loadObsStatus();
+}
+
+init();
