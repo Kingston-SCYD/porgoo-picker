@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import time
 from dataclasses import asdict, dataclass
@@ -195,6 +196,11 @@ def overlay():
     return render_template("overlay.html")
 
 
+@app.get("/admin")
+def admin_overlay():
+    return render_template("admin.html")
+
+
 @app.get("/api/obs-status")
 def obs_status():
     return jsonify(get_obs_status())
@@ -203,7 +209,7 @@ def obs_status():
 @app.get("/api/links")
 def get_links():
     base = request.host_url.rstrip("/")
-    return jsonify({"panel_url": f"{base}/", "overlay_url": f"{base}/overlay"})
+    return jsonify({"panel_url": f"{base}/", "overlay_url": f"{base}/overlay", "admin_url": f"{base}/admin"})
 
 
 @app.get("/api/assets")
@@ -315,6 +321,57 @@ def get_characters():
     with characters_lock:
         serialized = [asdict(char) for char in characters.values()]
     return jsonify(serialized)
+
+
+@socketio.on("admin_update_character_state")
+def admin_update_character_state(payload):
+    if not isinstance(payload, dict):
+        return
+
+    username = str(payload.get("username", "")).strip()
+    if not username:
+        return
+
+    values = {}
+    for key in ["x", "y", "vx", "vy", "dir"]:
+        value = payload.get(key)
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            return
+        values[key] = float(value)
+
+    with characters_lock:
+        if username.lower() not in characters:
+            return
+
+    socketio.emit(
+        "character_state_updated",
+        {
+            "username": username,
+            "x": values["x"],
+            "y": values["y"],
+            "vx": values["vx"],
+            "vy": values["vy"],
+            "dir": 1 if values["dir"] >= 0 else -1,
+        },
+    )
+
+
+@socketio.on("admin_remove_character")
+def admin_remove_character(payload):
+    if not isinstance(payload, dict):
+        return
+
+    username = str(payload.get("username", "")).strip()
+    if not username:
+        return
+
+    with characters_lock:
+        removed = characters.pop(username.lower(), None)
+        if removed is None:
+            return
+        serialized = [asdict(char) for char in characters.values()]
+
+    socketio.emit("characters_updated", serialized)
 
 
 if __name__ == "__main__":

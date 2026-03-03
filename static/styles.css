@@ -172,3 +172,35 @@ button {
   font-weight: 700;
   font-size: 0.9rem;
 }
+
+
+.admin-overlay-page {
+  background: #111827;
+}
+
+.admin-banner {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  background: rgba(12, 18, 32, 0.88);
+  border: 1px solid #3a4d80;
+  color: #dce7ff;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.admin-overlay {
+  height: 100vh !important;
+  pointer-events: auto !important;
+}
+
+.character.draggable {
+  cursor: grab;
+}
+
+.admin-overlay.dragging .character.draggable {
+  cursor: grabbing;
+}

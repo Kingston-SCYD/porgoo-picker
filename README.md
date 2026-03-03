@@ -41,6 +41,7 @@ python app.py
 
 - Control UI: `http://localhost:5000/`
 - Overlay URL: `http://localhost:5000/overlay`
+- Admin overlay: `http://localhost:5000/admin`
 
 Add the overlay URL as an OBS Browser Source in your scene.
 
@@ -96,6 +97,8 @@ To let users open the panel without `:PORT` in the URL:
 4. Use the same host for OBS Browser Source overlay URL: `https://yourname.playit.gg/overlay`.
 
 This app uses relative URLs in the frontend, so users do not need to append a port when visiting through Playit.
+
+Admin page supports picking up porgu with click+hold, throwing with cursor velocity, and right-click removal. Movements are broadcast live to overlay clients.
 
 ### Proxy headers
 
